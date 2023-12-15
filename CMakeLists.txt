@@ -68,6 +68,8 @@ add_avr_executable(${PROJECT_NAME}
    external/arduino_core/cores/arduino/HardwareSerial.cpp
    external/arduino_core/cores/arduino/HardwareSerial0.cpp
    external/arduino_core/cores/arduino/Print.cpp
+   external/arduino_core/cores/arduino/wiring.c
+   external/arduino_core/cores/arduino/hooks.c
 )
 add_definitions("-DF_CPU=${MCU_SPEED}")
 avr_target_include_directories(${PROJECT_NAME} PUBLIC
