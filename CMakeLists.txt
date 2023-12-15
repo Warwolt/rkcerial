@@ -63,6 +63,11 @@ endif(AVR)
 # ---------------------------- Program executable ---------------------------- #
 add_avr_executable(${PROJECT_NAME}
    src/main.cpp
+   external/arduino_core/cores/arduino/USBCore.cpp
+   external/arduino_core/cores/arduino/CDC.cpp
+   external/arduino_core/cores/arduino/HardwareSerial.cpp
+   external/arduino_core/cores/arduino/HardwareSerial0.cpp
+   external/arduino_core/cores/arduino/Print.cpp
 )
 add_definitions("-DF_CPU=${MCU_SPEED}")
 avr_target_include_directories(${PROJECT_NAME} PUBLIC
@@ -70,3 +75,4 @@ avr_target_include_directories(${PROJECT_NAME} PUBLIC
     external/arduino_core/cores
     external/arduino_core/variants/standard
 )
+add_compile_options(-Os)

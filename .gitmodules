@@ -4,3 +4,6 @@
 [submodule "external/arduino_core"]
 	path = external/arduino_core
 	url = https://github.com/arduino/ArduinoCore-avr.git
+[submodule "external/serial-monitor"]
+	path = external/serial-monitor
+	url = https://github.com/PBahner/Serial-Monitor.git

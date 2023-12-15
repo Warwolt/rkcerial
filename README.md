@@ -1,5 +1,11 @@
 # RK Cerial: A wrapper around Arduino Uno serial communcation
 
+## Requirements
+
+- CMake
+- AVR Toolchain
+- Python3
+
 ## Setup and Build
 ### Install AVR Toolchain
 
@@ -18,6 +24,12 @@ Additionally, set the `AVR_FIND_ROOT_PATH` environment variable to the `avr`
 directory of the avr toolchain install.
 
 If needed, you should also install Make. On Windows, https://www.mingw-w64.org/ is recommended.
+
+### Install Python dependencies
+
+```
+pip install pyserial
+```
 
 ### Connect device and identify USB port
 
@@ -57,4 +69,13 @@ The makefile will have a generated `upload` rule, that will take care of flashin
 
 ```
 make -C build upload_rkseq
+```
+
+### Open log
+
+Run the python script to monitor the output from the Arduino Uno program.
+For port, enter the same value as for `<usb port>` in [Build Project](#build-project).
+
+```
+python3 ./external/serial-monitor/monitor.py
 ```
