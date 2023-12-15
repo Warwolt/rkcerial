@@ -65,3 +65,8 @@ add_avr_executable(${PROJECT_NAME}
    src/main.cpp
 )
 add_definitions("-DF_CPU=${MCU_SPEED}")
+avr_target_include_directories(${PROJECT_NAME} PUBLIC
+    external/arduino_core/cores/arduino
+    external/arduino_core/cores
+    external/arduino_core/variants/standard
+)
