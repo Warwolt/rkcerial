@@ -34,6 +34,9 @@ static unsigned long try_get_timestamp(void) {
 	return timestamp_ms;
 }
 
+static const char* COLOR_GREEN = "\033[32m";
+static const char* COLOR_RESET = "\033[0m";
+
 static void print_time_now(unsigned long timestamp_ms) {
 	char now_str[64] = { 0 };
 
@@ -43,9 +46,14 @@ static void print_time_now(unsigned long timestamp_ms) {
 	unsigned long seconds = (now_ms / 1000L) % 60L;
 	unsigned long milliseconds = now_ms % 1000L;
 
-	snprintf(now_str, 64, "[%02lu:%02lu:%02lu:%03lu] ", hour, minutes, seconds, milliseconds);
+	snprintf(now_str, 64, "[%02lu:%02lu:%02lu:%03lu %sINFO%s %s:%d] ", hour, minutes, seconds, milliseconds, COLOR_GREEN, COLOR_RESET, "main.cpp", __LINE__);
 	Serial.print(now_str);
 }
+
+// TODO:
+// log_info(fmt, ...)
+// log_warning(fmt, ...)
+// log_error(fmt, ...)
 
 int main(void) {
 	init();
