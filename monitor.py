@@ -8,13 +8,10 @@ def timestamp_now():
     '''
     Returns the current time as milliseconds since 00:00
     '''
-    current_time = datetime.now()
-    now_ms = 0
-    now_ms += current_time.hour * 1000 * 60 * 60
-    now_ms += current_time.minute * 1000 * 60
-    now_ms += current_time.second * 1000
-    now_ms += current_time.microsecond // 1000
-    return now_ms
+    midnight = datetime.now().replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    delta = datetime.now() - midnight
+    return delta.seconds * 1000 + delta.microseconds // 1000
 
 
 def signal_handler(sig, frame):
