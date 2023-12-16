@@ -1,5 +1,11 @@
 # RK Cerial: A wrapper around Arduino Uno serial communcation
 
+RK Cerial is a C library written to give C Arduino Uno programs access to the
+functionality of `Serial.print`, and wraps this with log macros like `LOG_INFO`.
+
+To conviniently monitor from the command line, there's a `monitor.py` python script
+that uses `pyserial`. The script also sets up the current wall clock time.
+
 ## Requirements
 
 - CMake
@@ -74,8 +80,8 @@ make -C build upload_rkseq
 ### Open log
 
 Run the python script to monitor the output from the Arduino Uno program.
-For port, enter the same value as for `<usb port>` in [Build Project](#build-project).
+Use the same value for `<usb port>` as you used in [Build Project](#build-project).
 
 ```
-python3 ./external/serial-monitor/monitor.py
+python3 ./monitor.py <usb port>
 ```
