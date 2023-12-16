@@ -27,11 +27,22 @@ static const char* log_level_color[] = {
 	COLOR_RED,
 };
 
-
+/* ----------------------------- String utility ----------------------------- */
 static bool string_starts_with(const char* str, const char* prefix) {
 	return strncmp(prefix, str, strlen(prefix)) == 0;
 }
 
+static const char* file_name_from_path(const char* path) {
+    const char* file_name = path;
+    while (*(path++)) {
+        if (*path == '/' || *path == '\\') {
+            file_name = path + 1;
+        }
+    }
+    return file_name;
+}
+
+/* ------------------------------- Serial IO -------------------------------- */
 static int read_byte(void) {
 	const unsigned long timeout_ms = 1000;
 	unsigned long start_ms = millis();
@@ -90,6 +101,7 @@ static int sprintf_time(char* str_buf, size_t str_buf_len) {
 	return snprintf(str_buf, str_buf_len, "%02lu:%02lu:%02lu:%03lu", hour, minutes, seconds, milliseconds);
 }
 
+/* ------------------------------- Public API ------------------------------- */
 void rk_init_logging(void) {
 	init(); // wiring.c init, initializes the millis() function
 	Serial.begin(9600);
@@ -136,7 +148,7 @@ void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, .
 	/* Print prefix */
 	offset += snprintf(str + offset, 128 - offset, "[");
 	offset += sprintf_time(str + offset, 128 - offset);
-	offset += snprintf(str + offset, 128 - offset, " %s%s%s %s:%d] ", log_level_color[level], log_level_str[level], COLOR_RESET, file, line);
+	offset += snprintf(str + offset, 128 - offset, " %s%s%s %s:%d] ", log_level_color[level], log_level_str[level], COLOR_RESET, file_name_from_path(file), line);
 
 	/* Print user string */
 	va_list args;
