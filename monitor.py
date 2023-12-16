@@ -49,5 +49,4 @@ while True:
     if not has_sent_time:
         has_sent_time = True
         time_str = "TIMENOW {}".format(timestamp_now())
-        print("[Monitor]", time_str)
         ser.write(time_str.encode())

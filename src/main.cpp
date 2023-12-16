@@ -28,7 +28,6 @@ static unsigned long try_get_timestamp(void) {
 		if (string_starts_with(input_buf, "TIMENOW")) {
 			int offset = strlen("TIMENOW ");
 			timestamp_ms = strtol(&input_buf[offset], NULL, 10);
-			Serial.print(timestamp_ms);
 		}
 	}
 
@@ -36,20 +35,15 @@ static unsigned long try_get_timestamp(void) {
 }
 
 static void print_time_now(unsigned long timestamp_ms) {
-	if (timestamp_ms == 0) {
-		return;
-	}
-
 	char now_str[64] = { 0 };
 
-	// unsigned long now_ms = timestamp_ms + millis();
-	unsigned long now_ms = timestamp_ms;
+	unsigned long now_ms = timestamp_ms + millis();
 
 	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
 	unsigned long minutes = (now_ms / (1000L * 60L)) % 60L;
 	unsigned long seconds = (now_ms / 1000L) % 60L;
 	unsigned long milliseconds = now_ms % 1000L;
-	snprintf(now_str, 64, "[%lu:%lu:%lu:%lu] ", hour, minutes, seconds, milliseconds);
+	snprintf(now_str, 64, "[%02lu:%02lu:%02lu:%02lu] ", hour, minutes, seconds, milliseconds);
 
 	Serial.print(now_str);
 }
@@ -71,7 +65,9 @@ int main(void) {
 		PORTB = 0b00100000; // PB5
 		_delay_ms(1000);
 
-		print_time_now(timestamp_ms);
+		if (timestamp_ms > 0) {
+			print_time_now(timestamp_ms);
+		}
 		Serial.print("Hello World\n");
 
 		PORTB = 0b00000000; // PB5
