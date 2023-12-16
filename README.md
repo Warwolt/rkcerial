@@ -1,4 +1,4 @@
-# RK Cerial: A wrapper around Arduino Uno serial communcation
+# RK Cerial: a C wrapper around Arduino Uno serial communcation
 
 RK Cerial is a C library written to give C Arduino Uno programs access to the
 functionality of `Serial.print`, and wraps this with log macros like `LOG_INFO`.
@@ -8,9 +8,12 @@ that uses `pyserial`. The script also sets up the current wall clock time.
 
 ## Requirements
 
-- CMake
-- AVR Toolchain
-- Python3
+- [CMake 3.16 or later](https://cmake.org/download/)
+- [AVR Toolchain](https://www.microchip.com/en-us/tools-resources/develop/microchip-studio/gcc-compilers)
+- [Python3](https://www.python.org/downloads/)
+
+On Windows:
+- [MinGW Make](https://www.mingw-w64.org/)
 
 ## Setup and Build
 ### Install AVR Toolchain
@@ -44,7 +47,7 @@ LED marked "ON" lights up. Identify which USB port is used by the Arduino.
 
 On Windows, you can open up the device manager and look under "Ports (COM &
 LPT)" (you can disconnect then reconnect the device to see which belongs to the
-Arduino):
+Arduino).
 
 ### Build project
 
