@@ -10,8 +10,8 @@ def timestamp_now():
     '''
     current_time = datetime.now()
     now_ms = 0
-    now_ms += current_time.hour * (1000 * 60 * 60)
-    now_ms += current_time.minute * (1000 * 60)
+    now_ms += current_time.hour * 1000 * 60 * 60
+    now_ms += current_time.minute * 1000 * 60
     now_ms += current_time.second * 1000
     now_ms += current_time.microsecond // 1000
     return  now_ms

@@ -38,20 +38,19 @@ static void print_time_now(unsigned long timestamp_ms) {
 	char now_str[64] = { 0 };
 
 	unsigned long now_ms = timestamp_ms + millis();
-
 	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
 	unsigned long minutes = (now_ms / (1000L * 60L)) % 60L;
 	unsigned long seconds = (now_ms / 1000L) % 60L;
 	unsigned long milliseconds = now_ms % 1000L;
-	snprintf(now_str, 64, "[%02lu:%02lu:%02lu:%02lu] ", hour, minutes, seconds, milliseconds);
 
+	snprintf(now_str, 64, "[%02lu:%02lu:%02lu:%02lu] ", hour, minutes, seconds, milliseconds);
 	Serial.print(now_str);
 }
 
 int main(void) {
 	init();
 
-	DDRB = 0b00100000; // PB5 output
+	DDRB = 0b00100000; // set output mode for pin PB5
 
 	Serial.begin(9600);
 	Serial.print("Program Start\n");
@@ -62,7 +61,7 @@ int main(void) {
 			timestamp_ms = try_get_timestamp();
 		}
 
-		PORTB = 0b00100000; // PB5
+		PORTB = 0b00100000; // set PB5
 		_delay_ms(1000);
 
 		if (timestamp_ms > 0) {
@@ -70,7 +69,7 @@ int main(void) {
 		}
 		Serial.print("Hello World\n");
 
-		PORTB = 0b00000000; // PB5
+		PORTB = 0b00000000; // clear PB5
 		_delay_ms(1000);
 	}
 }
