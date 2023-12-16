@@ -40,9 +40,6 @@ static unsigned long try_get_ms_since_midnight(void) {
 	return timestamp_ms;
 }
 
-static const char* COLOR_GREEN = "\033[32m";
-static const char* COLOR_RESET = "\033[0m";
-
 static int print_time(char* str_buf, size_t str_buf_len) {
 	unsigned long now_ms = g_ms_since_midnight + millis();
 	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
@@ -75,11 +72,11 @@ static void read_string(char* str_buf, size_t str_buf_len) {
 	}
 }
 
-void rkcerial_init_logging(void) {
+void rk_init_logging(void) {
 	init(); // wiring.c init, initializes the millis() function
 	Serial.begin(9600);
 
-	rkcerial_printf("[ Logging ] Logging initialized, waiting for wall clock time.\n");
+	rk_printf("[ Logging ] Logging initialized, waiting for wall clock time.\n");
 
 	char input_buf[64] = { 0 };
 	const unsigned long timeout_ms = 2000;
@@ -91,20 +88,20 @@ void rkcerial_init_logging(void) {
 			/* Received clock time */
 			int offset = strlen("TIMENOW ");
 			g_ms_since_midnight = strtol(input_buf + offset, NULL, 10);
-			rkcerial_printf("[ Logging ] Received wall clock time.\n", g_ms_since_midnight);
+			rk_printf("[ Logging ] Received wall clock time.\n", g_ms_since_midnight);
 			break;
 		}
 
 		/* Timed out, abort */
 		const unsigned long now_ms = millis();
 		if (now_ms - start_ms > timeout_ms) {
-			rkcerial_printf("[ Logging ] Timed out on getting wall clock time (waited %lu milliseconds).\n", timeout_ms);
+			rk_printf("[ Logging ] Timed out on getting wall clock time (waited %lu milliseconds).\n", timeout_ms);
 			break;
 		}
 	}
 }
 
-void rkcerial_printf(const char* fmt, ...) {
+void rk_printf(const char* fmt, ...) {
 	char str[128];
 	va_list args;
 	va_start(args, fmt);
@@ -114,14 +111,31 @@ void rkcerial_printf(const char* fmt, ...) {
 	Serial.print(str);
 }
 
-void rkcerial_log_info(const char* file, int line, const char* fmt, ...) {
+#define COLOR_GREEN "\033[32m"
+#define COLOR_RED "\033[31m"
+#define COLOR_YELLOW "\033[33m"
+#define COLOR_RESET "\033[0m"
+
+static const char* log_level_str[] = {
+	"INFO",
+	"WARNING",
+	"ERROR",
+};
+
+static const char* log_level_color[] = {
+	COLOR_GREEN,
+	COLOR_YELLOW,
+	COLOR_RED,
+};
+
+void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, ...) {
 	char str[128];
 	int offset = 0;
 
-	/* Prefix */
+	/* Print prefix */
 	offset += snprintf(str + offset, 128 - offset, "[");
 	offset += print_time(str + offset, 128 - offset);
-	offset += snprintf(str + offset, 128 - offset, " INFO %s:%d] ", file, line);
+	offset += snprintf(str + offset, 128 - offset, " %s%s%s %s:%d] ", log_level_color[level], log_level_str[level], COLOR_RESET, file, line);
 
 	/* Print user string */
 	va_list args;

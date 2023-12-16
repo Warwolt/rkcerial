@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     baud = 9600
     port = sys.argv[1]
-    ser = serial.Serial(port, baud)
+    ser = serial.Serial(port, baud, timeout=0.5)
     # We use a quirk where opening serial communication with the Arduino Uno will
     # reset it, and therefore send the time stamp message after we receive the first
     # message from the Arduino.
@@ -41,10 +41,11 @@ if __name__ == "__main__":
     while True:
         # Wait until receive a line
         ser_in = ser.readline().decode('utf-8').strip('\n')
-        print(ser_in)
+        if ser_in:
+            print(ser_in)
 
         # If not yet sent current time, send it
-        if not has_sent_time:
+        if ser_in and not has_sent_time:
             has_sent_time = True
             time_str = "TIMENOW {}".format(timestamp_now())
             print("[ Monitor ] Sending wall clock time.")

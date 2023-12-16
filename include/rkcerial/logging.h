@@ -3,10 +3,18 @@ typedef enum {
     RK_LOG_LEVEL_INFO,
     RK_LOG_LEVEL_WARNING,
     RK_LOG_LEVEL_ERROR,
-} rkcerial_log_level_t;
+} rk_log_level_t;
 
-#define LOG_INFO(...) rkcerial_log_info(__FILE__, __LINE__, __VA_ARGS__)
+#ifdef NDEBUG
+#define LOG_INFO(...)
+#define LOG_WARNING(...)
+#define LOG_ERROR(...)
+#else
+#define LOG_INFO(...) rk_log(RK_LOG_LEVEL_INFO, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_WARNING(...) rk_log(RK_LOG_LEVEL_WARNING, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_ERROR(...) rk_log(RK_LOG_LEVEL_ERROR, __FILE__, __LINE__, __VA_ARGS__)
+#endif
 
-void rkcerial_init_logging(void);
-void rkcerial_printf(const char* fmt, ...);
-void rkcerial_log_info(const char* file, int line, const char* fmt, ...);
+void rk_init_logging(void);
+void rk_printf(const char* fmt, ...);
+void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, ...);
