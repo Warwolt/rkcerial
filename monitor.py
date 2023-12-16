@@ -15,7 +15,7 @@ def timestamp_now():
 
 
 def signal_handler(sig, frame):
-    print("[Monitor] serial port monitor closed")
+    print("[ Monitor ] Serial port closed.")
     sys.exit(0)
 
 
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     # message from the Arduino.
     has_sent_time = False
 
-    print("[Monitor] serial port monitor opened (close with Ctrl+C)")
+    print("[ Monitor ] Serial port opened (close with Ctrl+C).")
 
     while True:
         # Wait until receive a line
@@ -47,4 +47,5 @@ if __name__ == "__main__":
         if not has_sent_time:
             has_sent_time = True
             time_str = "TIMENOW {}".format(timestamp_now())
+            print("[ Monitor ] Sending wall clock time.")
             ser.write(time_str.encode())
