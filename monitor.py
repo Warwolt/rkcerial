@@ -1,8 +1,8 @@
 import sys
 import serial
+import serial.tools.list_ports
 import signal
 from datetime import datetime
-
 
 def timestamp_now():
     '''
@@ -25,7 +25,11 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: monitor.py PORT", end="")
         print("")
-        print("PORT should be the serial port name on your OS, e.g. COM2 on Windows or ttyS0 on Linux")
+        print("PORT should be the serial port name on your OS, e.g. COM0 on Windows or ttyS0 on Linux")
+        print("")
+        print("Detected serial ports:")
+        for name in [comport.device for comport in serial.tools.list_ports.comports()]:
+            print(" - %s" % name)
         exit(1)
 
     baud = 9600
