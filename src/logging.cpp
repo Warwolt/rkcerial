@@ -4,6 +4,8 @@
 #include <avr/io.h>
 #include <stdio.h>
 
+#include <HardwareSerial_private.h>
+
 // from wiring.c
 void init(void);
 unsigned long millis(void);
@@ -12,10 +14,10 @@ unsigned long millis(void);
 #define SERIAL_TX_BUFFER_SIZE 64
 
 typedef struct {
-	volatile rx_buffer_index_t rx_buffer_head;
-	volatile rx_buffer_index_t rx_buffer_tail;
-	volatile tx_buffer_index_t tx_buffer_head;
-	volatile tx_buffer_index_t tx_buffer_tail;
+	volatile uint8_t rx_buffer_head;
+	volatile uint8_t rx_buffer_tail;
+	volatile uint8_t tx_buffer_head;
+	volatile uint8_t tx_buffer_tail;
 	uint8_t rx_buffer[SERIAL_RX_BUFFER_SIZE];
 	uint8_t tx_buffer[SERIAL_TX_BUFFER_SIZE];
 } serial_buffer_t;
@@ -59,6 +61,23 @@ static const char* file_name_from_path(const char* path) {
 #define clear_bit(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 #define set_bit(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 
+ISR(USART_RX_vect) {
+	const uint8_t byte = UDR0;
+	const bool parity_error = bit_is_set(UCSR0A, UPE0);
+	if (parity_error) {
+		return; // Parity error, discard read byte
+	}
+
+	uint8_t next_index = (g_serial_buffer.rx_buffer_head + 1) % SERIAL_RX_BUFFER_SIZE;
+	if (next_index == g_serial_buffer.rx_buffer_tail) {
+		return; // About to overflow, discard read byte
+	}
+
+	// Write read byte to buffer
+	g_serial_buffer.rx_buffer[g_serial_buffer.rx_buffer_head] = byte;
+	g_serial_buffer.rx_buffer_head = next_index;
+}
+
 static void serial_initialize(int baud) {
 	// enable "double the USART transmission speed"
 	UCSR0A = 1 << U2X0;
@@ -75,7 +94,14 @@ static void serial_initialize(int baud) {
 }
 
 static int serial_read_byte(void) {
-	return Serial.read();
+	// if the head isn't ahead of the tail, we don't have any characters
+	if (g_serial_buffer.rx_buffer_head == g_serial_buffer.rx_buffer_tail) {
+		return -1;
+	}
+
+	uint8_t byte = g_serial_buffer.rx_buffer[g_serial_buffer.rx_buffer_tail];
+	g_serial_buffer.rx_buffer_tail = (g_serial_buffer.rx_buffer_tail + 1) % SERIAL_RX_BUFFER_SIZE;
+	return byte;
 }
 
 static int serial_read_byte_with_timeout(void) {
@@ -101,6 +127,7 @@ static void serial_read_string(char* str_buf, size_t str_buf_len) {
 }
 
 static void serial_write(uint8_t byte) {
+	// TODO: inline Serial.write
 	Serial.write(byte);
 }
 
