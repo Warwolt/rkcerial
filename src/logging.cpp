@@ -33,16 +33,37 @@ static bool string_starts_with(const char* str, const char* prefix) {
 }
 
 static const char* file_name_from_path(const char* path) {
-    const char* file_name = path;
-    while (*(path++)) {
-        if (*path == '/' || *path == '\\') {
-            file_name = path + 1;
-        }
-    }
-    return file_name;
+	const char* file_name = path;
+	while (*(path++)) {
+		if (*path == '/' || *path == '\\') {
+			file_name = path + 1;
+		}
+	}
+	return file_name;
 }
 
 /* ------------------------------- Serial IO -------------------------------- */
+// Serial::begin
+#define SERIAL_8N1 0x06
+
+#define clear_bit(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+#define set_bit(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+
+static void serial_initialize(int baud) {
+	// enable "double the USART transmission speed"
+	UCSR0A = 1 << U2X0;
+
+	// set the baud rate
+	const uint16_t baud_setting = (F_CPU / 4 / baud - 1) / 2;
+	UBRR0L = baud_setting;
+	UBRR0H = baud_setting >> 8;
+
+	set_bit(UCSR0B, RXEN0); // enable UART Rx
+	set_bit(UCSR0B, TXEN0); // enable UART Tx
+	set_bit(UCSR0B, RXCIE0); // enable receive interrupts
+	clear_bit(UCSR0B, UDRIE0); // disable data register empty interrupts
+}
+
 static int read_byte(void) {
 	const unsigned long timeout_ms = 1000;
 	unsigned long start_ms = millis();
@@ -65,6 +86,7 @@ static void read_string(char* str_buf, size_t str_buf_len) {
 	}
 }
 
+/* ------------------------------- Time stamp ------------------------------- */
 static unsigned long try_get_ms_since_midnight(void) {
 	unsigned long timestamp_ms = 0;
 
@@ -104,7 +126,7 @@ static int sprintf_time(char* str_buf, size_t str_buf_len) {
 /* ------------------------------- Public API ------------------------------- */
 void rk_init_logging(void) {
 	init(); // wiring.c init, initializes the millis() function
-	Serial.begin(9600);
+	serial_initialize(9600);
 
 	rk_printf("[ Logging ] Logging initialized, waiting for wall clock time.\n");
 
