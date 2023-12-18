@@ -72,5 +72,5 @@ avr_target_include_directories(${PROJECT_NAME} PUBLIC
 )
 avr_target_link_libraries("${PROJECT_NAME}_main" PRIVATE ${PROJECT_NAME})
 add_definitions("-DF_CPU=${MCU_SPEED}")
-add_compile_options(-Os)
+add_compile_options(-Os -Wall -Werror)
 
