@@ -64,17 +64,9 @@ endif(AVR)
 add_avr_executable(${PROJECT_NAME}
    src/main.cpp
    src/logging.cpp
-   #
-   external/arduino_core/cores/arduino/HardwareSerial.cpp
-   external/arduino_core/cores/arduino/HardwareSerial0.cpp
-   external/arduino_core/cores/arduino/Print.cpp
 )
 avr_target_include_directories(${PROJECT_NAME} PUBLIC
     include
-    #
-    external/arduino_core/cores/arduino
-    external/arduino_core/cores
-    external/arduino_core/variants/standard
 )
 add_definitions("-DF_CPU=${MCU_SPEED}")
 add_compile_options(-Os)

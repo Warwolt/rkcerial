@@ -1,11 +1,43 @@
+/*
+  logging.c - Serial logging for the Arduino Uno in C
+  Copyright (c) 2006 Rasmus Källqvist.  All right reserved.
+
+  logging.c is heavily based on HardwareSerial.cpp and
+  HardwareSerial0.cpp by Nicholas Zambetti.
+
+  ------------------------------------------------------------
+
+  HardwareSerial.cpp - Hardware serial library for Wiring
+  Copyright (c) 2006 Nicholas Zambetti.  All right reserved.
+
+  This library is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This library is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+  Modified 23 November 2006 by David A. Mellis
+  Modified 28 September 2010 by Mark Sproul
+  Modified 14 August 2012 by Alarus
+  Modified 3 December 2013 by Matthijs Kooijman
+  Modified 18 December 2023 by Rasmus Källqvist
+*/
+
 #include <rkcerial/logging.h>
 
-#include <arduino/USBAPI.h>
 #include <avr/io.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <util/atomic.h>
-
-#include <HardwareSerial_private.h>
 
 #define clear_bit(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 #define set_bit(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
@@ -26,9 +58,12 @@ static const char* file_name_from_path(const char* path) {
 }
 
 /* --------------------------------- Timing --------------------------------- */
+#define CLOCK_CYCLES_PER_MICROSECOND() ( F_CPU / 1000000L )
+#define CLOCK_CYCLES_TO_MICROSECONDS(a) ( (a) / CLOCK_CYCLES_PER_MICROSECOND() )
+
 // the prescaler is set so that timer0 ticks every 64 clock cycles, and the
 // the overflow handler is called every 256 ticks.
-#define MICROSECONDS_PER_TIMER0_OVERFLOW (clockCyclesToMicroseconds(64 * 256))
+#define MICROSECONDS_PER_TIMER0_OVERFLOW (CLOCK_CYCLES_TO_MICROSECONDS(64 * 256))
 
 // the whole number of milliseconds per timer0 overflow
 #define MILLIS_INC (MICROSECONDS_PER_TIMER0_OVERFLOW / 1000)
@@ -189,9 +224,7 @@ static void serial_read_string(serial_t* serial, char* str_buf, size_t str_buf_l
 }
 
 static void serial_write(serial_t* serial, uint8_t byte) {
-	// Serial.write(byte);
-
-	tx_buffer_index_t next_index = (serial->tx.head + 1) % SERIAL_RING_BUFFER_SIZE;
+	uint8_t next_index = (serial->tx.head + 1) % SERIAL_RING_BUFFER_SIZE;
 	serial->tx.buffer[serial->tx.head] = byte;
 
 	// If the output buffer is full, there's nothing for it other than to
