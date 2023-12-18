@@ -6,43 +6,8 @@
 
 #include <HardwareSerial_private.h>
 
-// from wiring.c
-unsigned long millis(void);
-
-#define SERIAL_RX_BUFFER_SIZE 64
-#define SERIAL_TX_BUFFER_SIZE 64
-
-typedef struct {
-	volatile uint8_t rx_buffer_head;
-	volatile uint8_t rx_buffer_tail;
-	volatile uint8_t tx_buffer_head;
-	volatile uint8_t tx_buffer_tail;
-	uint8_t rx_buffer[SERIAL_RX_BUFFER_SIZE];
-	uint8_t tx_buffer[SERIAL_TX_BUFFER_SIZE];
-} serial_buffer_t;
-
-#define COLOR_GREEN "\033[32m"
-#define COLOR_RED "\033[31m"
-#define COLOR_YELLOW "\033[33m"
-#define COLOR_RESET "\033[0m"
-
 #define clear_bit(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 #define set_bit(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
-
-static unsigned long g_ms_since_midnight = 0;
-static serial_buffer_t g_serial_buffer = { 0 };
-
-static const char* log_level_str[] = {
-	"INFO",
-	"WARNING",
-	"ERROR",
-};
-
-static const char* log_level_color[] = {
-	COLOR_GREEN,
-	COLOR_YELLOW,
-	COLOR_RED,
-};
 
 /* ----------------------------- String utility ----------------------------- */
 static bool string_starts_with(const char* str, const char* prefix) {
@@ -60,6 +25,41 @@ static const char* file_name_from_path(const char* path) {
 }
 
 /* --------------------------------- Timing --------------------------------- */
+// the prescaler is set so that timer0 ticks every 64 clock cycles, and the
+// the overflow handler is called every 256 ticks.
+#define MICROSECONDS_PER_TIMER0_OVERFLOW (clockCyclesToMicroseconds(64 * 256))
+
+// the whole number of milliseconds per timer0 overflow
+#define MILLIS_INC (MICROSECONDS_PER_TIMER0_OVERFLOW / 1000)
+
+// the fractional number of milliseconds per timer0 overflow. we shift right
+// by three to fit these numbers into a byte. (for the clock speeds we care
+// about - 8 and 16 MHz - this doesn't lose precision.)
+#define FRACT_INC ((MICROSECONDS_PER_TIMER0_OVERFLOW % 1000) >> 3)
+#define FRACT_MAX (1000 >> 3)
+
+static volatile unsigned long g_timer0_overflow_count = 0;
+static volatile unsigned long g_timer0_millis = 0;
+static unsigned char g_timer0_fract = 0;
+
+ISR(TIMER0_OVF_vect) {
+	// copy these to local variables so they can be stored in registers
+	// (volatile variables must be read from memory on every access)
+	unsigned long m = g_timer0_millis;
+	unsigned char f = g_timer0_fract;
+
+	m += MILLIS_INC;
+	f += FRACT_INC;
+	if (f >= FRACT_MAX) {
+		f -= FRACT_MAX;
+		m += 1;
+	}
+
+	g_timer0_fract = f;
+	g_timer0_millis = m;
+	g_timer0_overflow_count++;
+}
+
 // Configures Timer 0 to be used for counting elapsed milliseconds
 static void timer_initialize() {
 	// Set prescale factor to be 64
@@ -72,10 +72,33 @@ static void timer_initialize() {
 
 // returns num elapsed milliseconds since program start
 static unsigned long time_now_ms() {
-	return millis();
+	unsigned long now_ms;
+	uint8_t old_SREG = SREG;
+
+	// disable interrupts while we read g_timer0_millis or we might get an
+	// inconsistent value (e.g. in the middle of a write to g_timer0_millis)
+	cli();
+	now_ms = g_timer0_millis;
+	SREG = old_SREG;
+
+	return now_ms;
 }
 
 /* ------------------------------- Serial IO -------------------------------- */
+#define SERIAL_RX_BUFFER_SIZE 64
+#define SERIAL_TX_BUFFER_SIZE 64
+
+typedef struct {
+	volatile uint8_t rx_buffer_head;
+	volatile uint8_t rx_buffer_tail;
+	volatile uint8_t tx_buffer_head;
+	volatile uint8_t tx_buffer_tail;
+	uint8_t rx_buffer[SERIAL_RX_BUFFER_SIZE];
+	uint8_t tx_buffer[SERIAL_TX_BUFFER_SIZE];
+} serial_buffer_t;
+
+static serial_buffer_t g_serial_buffer = { 0 };
+
 ISR(USART_RX_vect) {
 	const uint8_t byte = UDR0;
 	const bool parity_error = bit_is_set(UCSR0A, UPE0);
@@ -158,6 +181,35 @@ static int serial_num_available_bytes(void) {
 }
 
 /* ------------------------------- Public API ------------------------------- */
+#define COLOR_GREEN "\033[32m"
+#define COLOR_RED "\033[31m"
+#define COLOR_YELLOW "\033[33m"
+#define COLOR_RESET "\033[0m"
+
+static unsigned long g_ms_since_midnight = 0;
+
+static const char* log_level_str[] = {
+	"INFO",
+	"WARNING",
+	"ERROR",
+};
+
+static const char* log_level_color[] = {
+	COLOR_GREEN,
+	COLOR_YELLOW,
+	COLOR_RED,
+};
+
+static int sprintf_time(char* str_buf, size_t str_buf_len) {
+	unsigned long now_ms = g_ms_since_midnight + time_now_ms();
+	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
+	unsigned long minutes = (now_ms / (1000L * 60L)) % 60L;
+	unsigned long seconds = (now_ms / 1000L) % 60L;
+	unsigned long milliseconds = now_ms % 1000L;
+
+	return snprintf(str_buf, str_buf_len, "%02lu:%02lu:%02lu:%03lu", hour, minutes, seconds, milliseconds);
+}
+
 void rk_init_logging(void) {
 	sei(); // globally enable interrupts
 	timer_initialize();
@@ -196,16 +248,6 @@ void rk_printf(const char* fmt, ...) {
 	va_end(args);
 
 	serial_print(str);
-}
-
-static int sprintf_time(char* str_buf, size_t str_buf_len) {
-	unsigned long now_ms = g_ms_since_midnight + time_now_ms();
-	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
-	unsigned long minutes = (now_ms / (1000L * 60L)) % 60L;
-	unsigned long seconds = (now_ms / 1000L) % 60L;
-	unsigned long milliseconds = now_ms % 1000L;
-
-	return snprintf(str_buf, str_buf_len, "%02lu:%02lu:%02lu:%03lu", hour, minutes, seconds, milliseconds);
 }
 
 void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, ...) {
