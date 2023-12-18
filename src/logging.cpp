@@ -143,32 +143,6 @@ static int serial_num_available_bytes(void) {
 }
 
 /* ------------------------------- Time stamp ------------------------------- */
-static unsigned long try_get_ms_since_midnight(void) {
-	unsigned long timestamp_ms = 0;
-
-	char input_buf[64] = { 0 };
-	int input_buf_len = 0;
-	while (serial_num_available_bytes() > 0 && input_buf_len < (64 - 2)) {
-		input_buf[input_buf_len++] = serial_read_byte();
-	}
-
-	if (input_buf_len > 0) {
-		input_buf[input_buf_len++] = '\n';
-		input_buf[input_buf_len++] = '\0';
-		input_buf_len = 0;
-
-		serial_print(input_buf);
-
-		if (string_starts_with(input_buf, "TIMENOW")) {
-			serial_print("Got TIMENOW\n");
-			int offset = strlen("TIMENOW ");
-			timestamp_ms = strtol(&input_buf[offset], NULL, 10);
-		}
-	}
-
-	return timestamp_ms;
-}
-
 static int sprintf_time(char* str_buf, size_t str_buf_len) {
 	unsigned long now_ms = g_ms_since_midnight + millis();
 	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
