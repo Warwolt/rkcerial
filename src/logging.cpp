@@ -8,12 +8,25 @@
 void init(void);
 unsigned long millis(void);
 
+#define SERIAL_RX_BUFFER_SIZE 64
+#define SERIAL_TX_BUFFER_SIZE 64
+
+typedef struct {
+	volatile rx_buffer_index_t rx_buffer_head;
+	volatile rx_buffer_index_t rx_buffer_tail;
+	volatile tx_buffer_index_t tx_buffer_head;
+	volatile tx_buffer_index_t tx_buffer_tail;
+	uint8_t rx_buffer[SERIAL_RX_BUFFER_SIZE];
+	uint8_t tx_buffer[SERIAL_TX_BUFFER_SIZE];
+} serial_buffer_t;
+
 #define COLOR_GREEN "\033[32m"
 #define COLOR_RED "\033[31m"
 #define COLOR_YELLOW "\033[33m"
 #define COLOR_RESET "\033[0m"
 
 static unsigned long g_ms_since_midnight = 0;
+static serial_buffer_t g_serial_buffer = { 0 };
 
 static const char* log_level_str[] = {
 	"INFO",
@@ -43,9 +56,6 @@ static const char* file_name_from_path(const char* path) {
 }
 
 /* ------------------------------- Serial IO -------------------------------- */
-// Serial::begin
-#define SERIAL_8N1 0x06
-
 #define clear_bit(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 #define set_bit(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 
@@ -64,12 +74,16 @@ static void serial_initialize(int baud) {
 	clear_bit(UCSR0B, UDRIE0); // disable data register empty interrupts
 }
 
-static int read_byte(void) {
+static int serial_read_byte(void) {
+	return Serial.read();
+}
+
+static int serial_read_byte_with_timeout(void) {
 	const unsigned long timeout_ms = 1000;
-	unsigned long start_ms = millis();
+	const unsigned long start_ms = millis();
 	int byte;
 	do {
-		byte = Serial.read();
+		byte = serial_read_byte();
 		if (byte >= 0) {
 			return byte;
 		}
@@ -77,13 +91,28 @@ static int read_byte(void) {
 	return -1; // timed out
 }
 
-static void read_string(char* str_buf, size_t str_buf_len) {
+static void serial_read_string(char* str_buf, size_t str_buf_len) {
 	int index = 0;
-	int byte = read_byte();
+	int byte = serial_read_byte_with_timeout();
 	while (byte >= 0 && index < str_buf_len) {
 		str_buf[index++] = (char)byte;
-		byte = read_byte();
+		byte = serial_read_byte_with_timeout();
 	}
+}
+
+static void serial_write(uint8_t byte) {
+	Serial.write(byte);
+}
+
+static void serial_print(const char* str) {
+	while (*str) {
+		serial_write(*str);
+		str++;
+	}
+}
+
+static int serial_num_available_bytes(void) {
+	return Serial.available();
 }
 
 /* ------------------------------- Time stamp ------------------------------- */
@@ -92,8 +121,8 @@ static unsigned long try_get_ms_since_midnight(void) {
 
 	char input_buf[64] = { 0 };
 	int input_buf_len = 0;
-	while (Serial.available() > 0 && input_buf_len < (64 - 2)) {
-		input_buf[input_buf_len++] = Serial.read();
+	while (serial_num_available_bytes() > 0 && input_buf_len < (64 - 2)) {
+		input_buf[input_buf_len++] = serial_read_byte();
 	}
 
 	if (input_buf_len > 0) {
@@ -101,10 +130,10 @@ static unsigned long try_get_ms_since_midnight(void) {
 		input_buf[input_buf_len++] = '\0';
 		input_buf_len = 0;
 
-		Serial.print(input_buf);
+		serial_print(input_buf);
 
 		if (string_starts_with(input_buf, "TIMENOW")) {
-			Serial.print("Got TIMENOW\n");
+			serial_print("Got TIMENOW\n");
 			int offset = strlen("TIMENOW ");
 			timestamp_ms = strtol(&input_buf[offset], NULL, 10);
 		}
@@ -135,7 +164,7 @@ void rk_init_logging(void) {
 	const unsigned long start_ms = millis();
 	while (true) {
 		/* Read input, look for clock time */
-		read_string(input_buf, 64);
+		serial_read_string(input_buf, 64);
 		if (string_starts_with(input_buf, "TIMENOW")) {
 			/* Received clock time */
 			int offset = strlen("TIMENOW ");
@@ -160,7 +189,7 @@ void rk_printf(const char* fmt, ...) {
 	vsnprintf(str, 128, fmt, args);
 	va_end(args);
 
-	Serial.print(str);
+	serial_print(str);
 }
 
 void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, ...) {
@@ -178,5 +207,5 @@ void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, .
 	vsnprintf(str + offset, 128 - offset, fmt, args);
 	va_end(args);
 
-	Serial.print(str);
+	serial_print(str);
 }
