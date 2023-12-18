@@ -5,7 +5,7 @@ option(AVR_UPLOADTOOL_PORT "USB port that device is connected to")
 set(AVR_MCU atmega328p)
 set(MCU_SPEED 16000000UL)
 project(rkcerial)
-enable_language(CXX)
+enable_language(C)
 
 # ------------------------- Cross-compilation setup -------------------------- #
 if(AVR)
@@ -61,24 +61,16 @@ if(AVR)
 endif(AVR)
 
 # ---------------------------- Program executable ---------------------------- #
-add_avr_executable(${PROJECT_NAME}
-   src/main.cpp
-   src/logging.cpp
-   #
-   external/arduino_core/cores/arduino/USBCore.cpp
-   external/arduino_core/cores/arduino/CDC.cpp
-   external/arduino_core/cores/arduino/HardwareSerial.cpp
-   external/arduino_core/cores/arduino/HardwareSerial0.cpp
-   external/arduino_core/cores/arduino/Print.cpp
-   external/arduino_core/cores/arduino/wiring.c
-   external/arduino_core/cores/arduino/hooks.c
+add_avr_library(${PROJECT_NAME}
+    src/logging.c
+)
+add_avr_executable("${PROJECT_NAME}_main"
+   src/main.c
 )
 avr_target_include_directories(${PROJECT_NAME} PUBLIC
     include
-    #
-    external/arduino_core/cores/arduino
-    external/arduino_core/cores
-    external/arduino_core/variants/standard
 )
+avr_target_link_libraries("${PROJECT_NAME}_main" PRIVATE ${PROJECT_NAME})
 add_definitions("-DF_CPU=${MCU_SPEED}")
-add_compile_options(-Os)
+add_compile_options(-Os -Wall -Werror -Wextra)
+
