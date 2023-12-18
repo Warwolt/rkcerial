@@ -294,6 +294,16 @@ static int snprintf_time(char* str_buf, size_t str_buf_len) {
 	return snprintf(str_buf, str_buf_len, "%02lu:%02lu:%02lu:%03lu", hour, minutes, seconds, milliseconds);
 }
 
+static void rk_printf(const char* fmt, ...) {
+	char str[128];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(str, 128, fmt, args);
+	va_end(args);
+
+	serial_print(&g_serial, str);
+}
+
 void rk_init_logging(void) {
 	sei(); // globally enable interrupts
 	timer_initialize();
@@ -322,16 +332,6 @@ void rk_init_logging(void) {
 			break;
 		}
 	}
-}
-
-void rk_printf(const char* fmt, ...) {
-	char str[128];
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(str, 128, fmt, args);
-	va_end(args);
-
-	serial_print(&g_serial, str);
 }
 
 void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, ...) {

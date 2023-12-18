@@ -1,8 +1,8 @@
 
 typedef enum {
-    RK_LOG_LEVEL_INFO,
-    RK_LOG_LEVEL_WARNING,
-    RK_LOG_LEVEL_ERROR,
+	RK_LOG_LEVEL_INFO,
+	RK_LOG_LEVEL_WARNING,
+	RK_LOG_LEVEL_ERROR,
 } rk_log_level_t;
 
 #ifdef NDEBUG
@@ -16,5 +16,4 @@ typedef enum {
 #endif
 
 void rk_init_logging(void);
-void rk_printf(const char* fmt, ...);
 void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, ...);
