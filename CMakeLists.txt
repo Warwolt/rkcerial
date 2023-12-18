@@ -65,12 +65,9 @@ add_avr_executable(${PROJECT_NAME}
    src/main.cpp
    src/logging.cpp
    #
-   external/arduino_core/cores/arduino/USBCore.cpp
-   external/arduino_core/cores/arduino/CDC.cpp
    external/arduino_core/cores/arduino/HardwareSerial.cpp
    external/arduino_core/cores/arduino/HardwareSerial0.cpp
    external/arduino_core/cores/arduino/Print.cpp
-   external/arduino_core/cores/arduino/hooks.c
 )
 avr_target_include_directories(${PROJECT_NAME} PUBLIC
     include
