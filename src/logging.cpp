@@ -85,16 +85,17 @@ static unsigned long time_now_ms() {
 }
 
 /* ------------------------------- Serial IO -------------------------------- */
-#define SERIAL_RX_BUFFER_SIZE 64
-#define SERIAL_TX_BUFFER_SIZE 64
+#define SERIAL_RING_BUFFER_SIZE 64
 
 typedef struct {
-	volatile uint8_t rx_buffer_head;
-	volatile uint8_t rx_buffer_tail;
-	volatile uint8_t tx_buffer_head;
-	volatile uint8_t tx_buffer_tail;
-	uint8_t rx_buffer[SERIAL_RX_BUFFER_SIZE];
-	uint8_t tx_buffer[SERIAL_TX_BUFFER_SIZE];
+	volatile uint8_t head;
+	volatile uint8_t tail;
+	uint8_t buffer[SERIAL_RING_BUFFER_SIZE];
+} ringbuffer_t;
+
+typedef struct {
+	ringbuffer_t rx;
+	ringbuffer_t tx;
 } serial_t;
 
 static serial_t g_serial = { 0 };
@@ -106,14 +107,14 @@ ISR(USART_RX_vect) {
 		return; // Parity error, discard read byte
 	}
 
-	uint8_t next_index = (g_serial.rx_buffer_head + 1) % SERIAL_RX_BUFFER_SIZE;
-	if (next_index == g_serial.rx_buffer_tail) {
+	uint8_t next_index = (g_serial.rx.head + 1) % SERIAL_RX_BUFFER_SIZE;
+	if (next_index == g_serial.rx.tail) {
 		return; // About to overflow, discard read byte
 	}
 
 	// Write read byte to buffer
-	g_serial.rx_buffer[g_serial.rx_buffer_head] = byte;
-	g_serial.rx_buffer_head = next_index;
+	g_serial.rx.buffer[g_serial.rx.head] = byte;
+	g_serial.rx.head = next_index;
 }
 
 static void serial_initialize(int baud) {
@@ -133,12 +134,12 @@ static void serial_initialize(int baud) {
 
 static int serial_read_byte(serial_t* serial) {
 	// if the head isn't ahead of the tail, we don't have any characters
-	if (serial->rx_buffer_head == serial->rx_buffer_tail) {
+	if (serial->rx.head == serial->rx.tail) {
 		return -1;
 	}
 
-	uint8_t byte = serial->rx_buffer[serial->rx_buffer_tail];
-	serial->rx_buffer_tail = (serial->rx_buffer_tail + 1) % SERIAL_RX_BUFFER_SIZE;
+	uint8_t byte = serial->rx.buffer[serial->rx.tail];
+	serial->rx.tail = (serial->rx.tail + 1) % SERIAL_RX_BUFFER_SIZE;
 	return byte;
 }
 
@@ -199,7 +200,7 @@ static const char* log_level_color[] = {
 	COLOR_RED,
 };
 
-static int sprintf_time(char* str_buf, size_t str_buf_len) {
+static int snprintf_time(char* str_buf, size_t str_buf_len) {
 	unsigned long now_ms = g_ms_since_midnight + time_now_ms();
 	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
 	unsigned long minutes = (now_ms / (1000L * 60L)) % 60L;
@@ -255,7 +256,7 @@ void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, .
 
 	/* Print prefix */
 	offset += snprintf(str + offset, 128 - offset, "[");
-	offset += sprintf_time(str + offset, 128 - offset);
+	offset += snprintf_time(str + offset, 128 - offset);
 	offset += snprintf(str + offset, 128 - offset, " %s%s%s %s:%d] ", log_level_color[level], log_level_str[level], COLOR_RESET, file_name_from_path(file), line);
 
 	/* Print user string */
