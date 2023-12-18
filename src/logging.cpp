@@ -3,6 +3,7 @@
 #include <arduino/USBAPI.h>
 #include <avr/io.h>
 #include <stdio.h>
+#include <util/atomic.h>
 
 #include <HardwareSerial_private.h>
 
@@ -100,14 +101,14 @@ typedef struct {
 
 static serial_t g_serial = { 0 };
 
-ISR(USART_RX_vect) {
+static void rx_complete_irq(void) {
 	const uint8_t byte = UDR0;
 	const bool parity_error = bit_is_set(UCSR0A, UPE0);
 	if (parity_error) {
 		return; // Parity error, discard read byte
 	}
 
-	uint8_t next_index = (g_serial.rx.head + 1) % SERIAL_RX_BUFFER_SIZE;
+	uint8_t next_index = (g_serial.rx.head + 1) % SERIAL_RING_BUFFER_SIZE;
 	if (next_index == g_serial.rx.tail) {
 		return; // About to overflow, discard read byte
 	}
@@ -115,6 +116,28 @@ ISR(USART_RX_vect) {
 	// Write read byte to buffer
 	g_serial.rx.buffer[g_serial.rx.head] = byte;
 	g_serial.rx.head = next_index;
+}
+
+ISR(USART_RX_vect) {
+	rx_complete_irq();
+}
+
+static void tx_udr_empty_irq(void) {
+	// If interrupts are enabled, there must be more data in the output
+	// buffer. Send the next byte
+	unsigned char byte = g_serial.tx.buffer[g_serial.tx.tail];
+	g_serial.tx.tail = (g_serial.tx.tail + 1) % SERIAL_RING_BUFFER_SIZE;
+
+	UDR0 = byte;
+
+	if (g_serial.tx.head == g_serial.tx.tail) {
+		// Buffer empty, so disable interrupts
+		clear_bit(UCSR0B, UDRIE0);
+	}
+}
+
+ISR(USART_UDRE_vect) {
+	tx_udr_empty_irq();
 }
 
 static void serial_initialize(int baud) {
@@ -139,7 +162,7 @@ static int serial_read_byte(serial_t* serial) {
 	}
 
 	uint8_t byte = serial->rx.buffer[serial->rx.tail];
-	serial->rx.tail = (serial->rx.tail + 1) % SERIAL_RX_BUFFER_SIZE;
+	serial->rx.tail = (serial->rx.tail + 1) % SERIAL_RING_BUFFER_SIZE;
 	return byte;
 }
 
@@ -165,19 +188,46 @@ static void serial_read_string(serial_t* serial, char* str_buf, size_t str_buf_l
 	}
 }
 
-static void serial_write(uint8_t byte) {
-	Serial.write(byte);
+static void serial_write(serial_t* serial, uint8_t byte) {
+	// Serial.write(byte);
+
+	tx_buffer_index_t next_index = (serial->tx.head + 1) % SERIAL_RING_BUFFER_SIZE;
+	serial->tx.buffer[serial->tx.head] = byte;
+
+	// If the output buffer is full, there's nothing for it other than to
+	// wait for the interrupt handler to empty it a bit
+	while (next_index == serial->tx.tail) {
+		if (bit_is_clear(SREG, SREG_I)) {
+			// Interrupts are disabled, so we'll have to poll the data
+			// register empty flag ourselves. If it is set, pretend an
+			// interrupt has happened and call the handler to free up
+			// space for us.
+			if (bit_is_set(UCSR0A, UDRE0)) {
+				tx_udr_empty_irq();
+			}
+		} else {
+			// nop, the interrupt handler will free up space for us
+		}
+	}
+
+	// make atomic to prevent execution of ISR between setting the
+	// head pointer and setting the interrupt flag resulting in buffer
+	// retransmission
+	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+		serial->tx.head = next_index;
+		set_bit(UCSR0B, UDRIE0);
+	}
 }
 
-static void serial_print(const char* str) {
+static void serial_print(serial_t* serial, const char* str) {
 	while (*str) {
-		serial_write(*str);
+		serial_write(serial, *str);
 		str++;
 	}
 }
 
-static int serial_num_available_bytes(void) {
-	return Serial.available();
+static uint8_t serial_num_available_bytes(serial_t* serial) {
+	return (SERIAL_RING_BUFFER_SIZE + serial->rx.head - serial->rx.tail) % SERIAL_RING_BUFFER_SIZE;
 }
 
 /* ------------------------------- Public API ------------------------------- */
@@ -247,7 +297,7 @@ void rk_printf(const char* fmt, ...) {
 	vsnprintf(str, 128, fmt, args);
 	va_end(args);
 
-	serial_print(str);
+	serial_print(&g_serial, str);
 }
 
 void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, ...) {
@@ -265,5 +315,5 @@ void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, .
 	vsnprintf(str + offset, 128 - offset, fmt, args);
 	va_end(args);
 
-	serial_print(str);
+	serial_print(&g_serial, str);
 }
