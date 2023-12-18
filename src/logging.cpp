@@ -27,6 +27,9 @@ typedef struct {
 #define COLOR_YELLOW "\033[33m"
 #define COLOR_RESET "\033[0m"
 
+#define clear_bit(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+#define set_bit(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+
 static unsigned long g_ms_since_midnight = 0;
 static serial_buffer_t g_serial_buffer = { 0 };
 
@@ -57,10 +60,17 @@ static const char* file_name_from_path(const char* path) {
 	return file_name;
 }
 
-/* ------------------------------- Serial IO -------------------------------- */
-#define clear_bit(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
-#define set_bit(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+/* --------------------------------- Timing --------------------------------- */
+static void timer_initialize() {
+	init();
+}
 
+// returns num elapsed milliseconds since program start
+static unsigned long time_now_ms() {
+	return millis();
+}
+
+/* ------------------------------- Serial IO -------------------------------- */
 ISR(USART_RX_vect) {
 	const uint8_t byte = UDR0;
 	const bool parity_error = bit_is_set(UCSR0A, UPE0);
@@ -106,14 +116,14 @@ static int serial_read_byte(void) {
 
 static int serial_read_byte_with_timeout(void) {
 	const unsigned long timeout_ms = 1000;
-	const unsigned long start_ms = millis();
+	const unsigned long start_ms = time_now_ms();
 	int byte;
 	do {
 		byte = serial_read_byte();
 		if (byte >= 0) {
 			return byte;
 		}
-	} while (millis() - start_ms < timeout_ms);
+	} while (time_now_ms() - start_ms < timeout_ms);
 	return -1; // timed out
 }
 
@@ -142,27 +152,16 @@ static int serial_num_available_bytes(void) {
 	return Serial.available();
 }
 
-/* ------------------------------- Time stamp ------------------------------- */
-static int sprintf_time(char* str_buf, size_t str_buf_len) {
-	unsigned long now_ms = g_ms_since_midnight + millis();
-	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
-	unsigned long minutes = (now_ms / (1000L * 60L)) % 60L;
-	unsigned long seconds = (now_ms / 1000L) % 60L;
-	unsigned long milliseconds = now_ms % 1000L;
-
-	return snprintf(str_buf, str_buf_len, "%02lu:%02lu:%02lu:%03lu", hour, minutes, seconds, milliseconds);
-}
-
 /* ------------------------------- Public API ------------------------------- */
 void rk_init_logging(void) {
-	init(); // wiring.c init, initializes the millis() function
+	timer_initialize();
 	serial_initialize(9600);
 
 	rk_printf("[ Logging ] Logging initialized, waiting for wall clock time.\n");
 
 	char input_buf[64] = { 0 };
 	const unsigned long timeout_ms = 2000;
-	const unsigned long start_ms = millis();
+	const unsigned long start_ms = time_now_ms();
 	while (true) {
 		/* Read input, look for clock time */
 		serial_read_string(input_buf, 64);
@@ -175,7 +174,7 @@ void rk_init_logging(void) {
 		}
 
 		/* Timed out, abort */
-		const unsigned long now_ms = millis();
+		const unsigned long now_ms = time_now_ms();
 		if (now_ms - start_ms > timeout_ms) {
 			rk_printf("[ Logging ] Timed out on getting wall clock time (waited %lu milliseconds).\n", timeout_ms);
 			break;
@@ -191,6 +190,16 @@ void rk_printf(const char* fmt, ...) {
 	va_end(args);
 
 	serial_print(str);
+}
+
+static int sprintf_time(char* str_buf, size_t str_buf_len) {
+	unsigned long now_ms = g_ms_since_midnight + time_now_ms();
+	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
+	unsigned long minutes = (now_ms / (1000L * 60L)) % 60L;
+	unsigned long seconds = (now_ms / 1000L) % 60L;
+	unsigned long milliseconds = now_ms % 1000L;
+
+	return snprintf(str_buf, str_buf_len, "%02lu:%02lu:%02lu:%03lu", hour, minutes, seconds, milliseconds);
 }
 
 void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, ...) {
