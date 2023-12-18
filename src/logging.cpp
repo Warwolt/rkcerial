@@ -95,9 +95,9 @@ typedef struct {
 	volatile uint8_t tx_buffer_tail;
 	uint8_t rx_buffer[SERIAL_RX_BUFFER_SIZE];
 	uint8_t tx_buffer[SERIAL_TX_BUFFER_SIZE];
-} serial_buffer_t;
+} serial_t;
 
-static serial_buffer_t g_serial = { 0 };
+static serial_t g_serial = { 0 };
 
 ISR(USART_RX_vect) {
 	const uint8_t byte = UDR0;
@@ -131,23 +131,23 @@ static void serial_initialize(int baud) {
 	clear_bit(UCSR0B, UDRIE0); // disable data register empty interrupts
 }
 
-static int serial_read_byte(void) {
+static int serial_read_byte(serial_t* serial) {
 	// if the head isn't ahead of the tail, we don't have any characters
-	if (g_serial.rx_buffer_head == g_serial.rx_buffer_tail) {
+	if (serial->rx_buffer_head == serial->rx_buffer_tail) {
 		return -1;
 	}
 
-	uint8_t byte = g_serial.rx_buffer[g_serial.rx_buffer_tail];
-	g_serial.rx_buffer_tail = (g_serial.rx_buffer_tail + 1) % SERIAL_RX_BUFFER_SIZE;
+	uint8_t byte = serial->rx_buffer[serial->rx_buffer_tail];
+	serial->rx_buffer_tail = (serial->rx_buffer_tail + 1) % SERIAL_RX_BUFFER_SIZE;
 	return byte;
 }
 
-static int serial_read_byte_with_timeout(void) {
+static int serial_read_byte_with_timeout(serial_t* serial) {
 	const unsigned long timeout_ms = 1000;
 	const unsigned long start_ms = time_now_ms();
 	int byte;
 	do {
-		byte = serial_read_byte();
+		byte = serial_read_byte(serial);
 		if (byte >= 0) {
 			return byte;
 		}
@@ -155,12 +155,12 @@ static int serial_read_byte_with_timeout(void) {
 	return -1; // timed out
 }
 
-static void serial_read_string(char* str_buf, size_t str_buf_len) {
+static void serial_read_string(serial_t* serial, char* str_buf, size_t str_buf_len) {
 	int index = 0;
-	int byte = serial_read_byte_with_timeout();
+	int byte = serial_read_byte_with_timeout(serial);
 	while (byte >= 0 && index < str_buf_len) {
 		str_buf[index++] = (char)byte;
-		byte = serial_read_byte_with_timeout();
+		byte = serial_read_byte_with_timeout(serial);
 	}
 }
 
@@ -221,7 +221,7 @@ void rk_init_logging(void) {
 	const unsigned long start_ms = time_now_ms();
 	while (true) {
 		/* Read input, look for clock time */
-		serial_read_string(input_buf, 64);
+		serial_read_string(&g_serial, input_buf, 64);
 		if (string_starts_with(input_buf, "TIMENOW")) {
 			/* Received clock time */
 			int offset = strlen("TIMENOW ");
