@@ -34,9 +34,10 @@
 #include <rkcerial/logging.h>
 
 #include <avr/io.h>
+#include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <util/atomic.h>
 
 #define clear_bit(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -58,8 +59,8 @@ static const char* file_name_from_path(const char* path) {
 }
 
 /* --------------------------------- Timing --------------------------------- */
-#define CLOCK_CYCLES_PER_MICROSECOND() ( F_CPU / 1000000L )
-#define CLOCK_CYCLES_TO_MICROSECONDS(a) ( (a) / CLOCK_CYCLES_PER_MICROSECOND() )
+#define CLOCK_CYCLES_PER_MICROSECOND() (F_CPU / 1000000L)
+#define CLOCK_CYCLES_TO_MICROSECONDS(a) ((a) / CLOCK_CYCLES_PER_MICROSECOND())
 
 // the prescaler is set so that timer0 ticks every 64 clock cycles, and the
 // the overflow handler is called every 256 ticks.

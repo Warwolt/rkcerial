@@ -5,7 +5,7 @@ option(AVR_UPLOADTOOL_PORT "USB port that device is connected to")
 set(AVR_MCU atmega328p)
 set(MCU_SPEED 16000000UL)
 project(rkcerial)
-enable_language(CXX)
+enable_language(C)
 
 # ------------------------- Cross-compilation setup -------------------------- #
 if(AVR)
@@ -62,8 +62,8 @@ endif(AVR)
 
 # ---------------------------- Program executable ---------------------------- #
 add_avr_executable(${PROJECT_NAME}
-   src/main.cpp
-   src/logging.cpp
+   src/main.c
+   src/logging.c
 )
 avr_target_include_directories(${PROJECT_NAME} PUBLIC
     include
