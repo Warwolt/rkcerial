@@ -77,7 +77,7 @@ built, we can upload it to the Arduino.
 The makefile will have a generated `upload` rule, that will take care of flashing the binary:
 
 ```
-make -C build upload_rkseq
+make -C build upload_rkcerial_main
 ```
 
 ### Open log

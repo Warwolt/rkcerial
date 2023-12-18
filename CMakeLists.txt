@@ -61,12 +61,16 @@ if(AVR)
 endif(AVR)
 
 # ---------------------------- Program executable ---------------------------- #
-add_avr_executable(${PROJECT_NAME}
+add_avr_library(${PROJECT_NAME}
+    src/logging.c
+)
+add_avr_executable("${PROJECT_NAME}_main"
    src/main.c
-   src/logging.c
 )
 avr_target_include_directories(${PROJECT_NAME} PUBLIC
     include
 )
+avr_target_link_libraries("${PROJECT_NAME}_main" PRIVATE ${PROJECT_NAME})
 add_definitions("-DF_CPU=${MCU_SPEED}")
 add_compile_options(-Os)
+
