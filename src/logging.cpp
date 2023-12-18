@@ -97,7 +97,7 @@ typedef struct {
 	uint8_t tx_buffer[SERIAL_TX_BUFFER_SIZE];
 } serial_buffer_t;
 
-static serial_buffer_t g_serial_buffer = { 0 };
+static serial_buffer_t g_serial = { 0 };
 
 ISR(USART_RX_vect) {
 	const uint8_t byte = UDR0;
@@ -106,14 +106,14 @@ ISR(USART_RX_vect) {
 		return; // Parity error, discard read byte
 	}
 
-	uint8_t next_index = (g_serial_buffer.rx_buffer_head + 1) % SERIAL_RX_BUFFER_SIZE;
-	if (next_index == g_serial_buffer.rx_buffer_tail) {
+	uint8_t next_index = (g_serial.rx_buffer_head + 1) % SERIAL_RX_BUFFER_SIZE;
+	if (next_index == g_serial.rx_buffer_tail) {
 		return; // About to overflow, discard read byte
 	}
 
 	// Write read byte to buffer
-	g_serial_buffer.rx_buffer[g_serial_buffer.rx_buffer_head] = byte;
-	g_serial_buffer.rx_buffer_head = next_index;
+	g_serial.rx_buffer[g_serial.rx_buffer_head] = byte;
+	g_serial.rx_buffer_head = next_index;
 }
 
 static void serial_initialize(int baud) {
@@ -133,12 +133,12 @@ static void serial_initialize(int baud) {
 
 static int serial_read_byte(void) {
 	// if the head isn't ahead of the tail, we don't have any characters
-	if (g_serial_buffer.rx_buffer_head == g_serial_buffer.rx_buffer_tail) {
+	if (g_serial.rx_buffer_head == g_serial.rx_buffer_tail) {
 		return -1;
 	}
 
-	uint8_t byte = g_serial_buffer.rx_buffer[g_serial_buffer.rx_buffer_tail];
-	g_serial_buffer.rx_buffer_tail = (g_serial_buffer.rx_buffer_tail + 1) % SERIAL_RX_BUFFER_SIZE;
+	uint8_t byte = g_serial.rx_buffer[g_serial.rx_buffer_tail];
+	g_serial.rx_buffer_tail = (g_serial.rx_buffer_tail + 1) % SERIAL_RX_BUFFER_SIZE;
 	return byte;
 }
 
@@ -165,7 +165,6 @@ static void serial_read_string(char* str_buf, size_t str_buf_len) {
 }
 
 static void serial_write(uint8_t byte) {
-	// TODO: inline Serial.write
 	Serial.write(byte);
 }
 
