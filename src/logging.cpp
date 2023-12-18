@@ -7,7 +7,6 @@
 #include <HardwareSerial_private.h>
 
 // from wiring.c
-void init(void);
 unsigned long millis(void);
 
 #define SERIAL_RX_BUFFER_SIZE 64
@@ -61,8 +60,14 @@ static const char* file_name_from_path(const char* path) {
 }
 
 /* --------------------------------- Timing --------------------------------- */
+// Configures Timer 0 to be used for counting elapsed milliseconds
 static void timer_initialize() {
-	init();
+	// Set prescale factor to be 64
+	set_bit(TCCR0B, CS01);
+	set_bit(TCCR0B, CS00);
+
+	// Enable timer 0 overflow interrupt
+	set_bit(TIMSK0, TOIE0);
 }
 
 // returns num elapsed milliseconds since program start
@@ -154,6 +159,7 @@ static int serial_num_available_bytes(void) {
 
 /* ------------------------------- Public API ------------------------------- */
 void rk_init_logging(void) {
+	sei(); // globally enable interrupts
 	timer_initialize();
 	serial_initialize(9600);
 
