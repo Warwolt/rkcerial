@@ -250,10 +250,15 @@ void rk_init_logging(time_now_ms_t callback) {
 	g_time_now_ms = callback ? callback : time_now_ms_noop;
 	serial_initialize(9600);
 
+	if (!callback) {
+		rk_printf("[ Logging ] Logging initialized. (Timestamps disabled).\n");
+		return;
+	}
+
 	rk_printf("[ Logging ] Logging initialized, waiting for wall clock time.\n");
 
 	char input_buf[64] = { 0 };
-	const unsigned long timeout_ms = 2000;
+	const unsigned long timeout_ms = 100;
 	const unsigned long start_ms = g_time_now_ms();
 	while (true) {
 		/* Read input, look for clock time */
@@ -281,8 +286,11 @@ void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, .
 
 	/* Print prefix */
 	offset += snprintf(str + offset, 128 - offset, "[");
-	offset += snprintf_time(str + offset, 128 - offset);
-	offset += snprintf(str + offset, 128 - offset, " %s%s%s %s:%d] ", log_level_color[level], log_level_str[level], COLOR_RESET, file_name_from_path(file), line);
+	if (g_time_now_ms != time_now_ms_noop) {
+		offset += snprintf_time(str + offset, 128 - offset);
+		offset += snprintf(str + offset, 128 - offset, " ");
+	}
+	offset += snprintf(str + offset, 128 - offset, "%s%s%s %s:%d] ", log_level_color[level], log_level_str[level], COLOR_RESET, file_name_from_path(file), line);
 
 	/* Print user string */
 	va_list args;
