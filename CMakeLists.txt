@@ -66,6 +66,7 @@ add_avr_library(${PROJECT_NAME}
 )
 add_avr_executable("${PROJECT_NAME}_main"
    src/main.c
+   src/timer.c
 )
 avr_target_include_directories(${PROJECT_NAME} PUBLIC
     include

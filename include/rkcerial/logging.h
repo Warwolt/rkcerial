@@ -15,5 +15,7 @@ typedef enum {
 #define LOG_ERROR(...) rk_log(RK_LOG_LEVEL_ERROR, __FILE__, __LINE__, __VA_ARGS__)
 #endif
 
-void rk_init_logging(void);
+typedef unsigned long (*time_now_ms_t)(void);
+
+void rk_init_logging(time_now_ms_t callback);
 void rk_log(rk_log_level_t level, const char* file, int line, const char* fmt, ...);

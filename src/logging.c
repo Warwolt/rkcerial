@@ -58,69 +58,6 @@ static const char* file_name_from_path(const char* path) {
 	return file_name;
 }
 
-/* --------------------------------- Timing --------------------------------- */
-#define CLOCK_CYCLES_PER_MICROSECOND() (F_CPU / 1000000L)
-#define CLOCK_CYCLES_TO_MICROSECONDS(a) ((a) / CLOCK_CYCLES_PER_MICROSECOND())
-
-// the prescaler is set so that timer0 ticks every 64 clock cycles, and the
-// the overflow handler is called every 256 ticks.
-#define MICROSECONDS_PER_TIMER0_OVERFLOW (CLOCK_CYCLES_TO_MICROSECONDS(64 * 256))
-
-// the whole number of milliseconds per timer0 overflow
-#define MILLIS_INC (MICROSECONDS_PER_TIMER0_OVERFLOW / 1000)
-
-// the fractional number of milliseconds per timer0 overflow. we shift right
-// by three to fit these numbers into a byte. (for the clock speeds we care
-// about - 8 and 16 MHz - this doesn't lose precision.)
-#define FRACT_INC ((MICROSECONDS_PER_TIMER0_OVERFLOW % 1000) >> 3)
-#define FRACT_MAX (1000 >> 3)
-
-static volatile unsigned long g_timer0_overflow_count = 0;
-static volatile unsigned long g_timer0_millis = 0;
-static unsigned char g_timer0_fract = 0;
-
-ISR(TIMER0_OVF_vect) {
-	// copy these to local variables so they can be stored in registers
-	// (volatile variables must be read from memory on every access)
-	unsigned long m = g_timer0_millis;
-	unsigned char f = g_timer0_fract;
-
-	m += MILLIS_INC;
-	f += FRACT_INC;
-	if (f >= FRACT_MAX) {
-		f -= FRACT_MAX;
-		m += 1;
-	}
-
-	g_timer0_fract = f;
-	g_timer0_millis = m;
-	g_timer0_overflow_count++;
-}
-
-// Configures Timer 0 to be used for counting elapsed milliseconds
-static void timer_initialize() {
-	// Set prescale factor to be 64
-	set_bit(TCCR0B, CS01);
-	set_bit(TCCR0B, CS00);
-
-	// Enable timer 0 overflow interrupt
-	set_bit(TIMSK0, TOIE0);
-}
-
-// returns num elapsed milliseconds since program start
-static unsigned long time_now_ms() {
-	unsigned long now_ms;
-	uint8_t old_SREG = SREG;
-
-	// disable interrupts while we read g_timer0_millis or we might get an
-	// inconsistent value (e.g. in the middle of a write to g_timer0_millis)
-	cli();
-	now_ms = g_timer0_millis;
-	SREG = old_SREG;
-
-	return now_ms;
-}
-
 /* ------------------------------- Serial IO -------------------------------- */
 #define SERIAL_RING_BUFFER_SIZE 64
 
@@ -136,6 +73,11 @@ typedef struct {
 } serial_t;
 
 static serial_t g_serial = { 0 };
+static unsigned long (*g_time_now_ms)(void);
+
+static unsigned long time_now_ms_noop(void) {
+	return 0;
+}
 
 static void rx_complete_irq(void) {
 	const uint8_t byte = UDR0;
@@ -204,14 +146,14 @@ static int serial_read_byte(serial_t* serial) {
 
 static int serial_read_byte_with_timeout(serial_t* serial) {
 	const unsigned long timeout_ms = 1000;
-	const unsigned long start_ms = time_now_ms();
+	const unsigned long start_ms = g_time_now_ms();
 	int byte;
 	do {
 		byte = serial_read_byte(serial);
 		if (byte >= 0) {
 			return byte;
 		}
-	} while (time_now_ms() - start_ms < timeout_ms);
+	} while (g_time_now_ms() - start_ms < timeout_ms);
 	return -1; // timed out
 }
 
@@ -285,7 +227,7 @@ static const char* log_level_color[] = {
 };
 
 static int snprintf_time(char* str_buf, size_t str_buf_len) {
-	unsigned long now_ms = g_ms_since_midnight + time_now_ms();
+	unsigned long now_ms = g_ms_since_midnight + g_time_now_ms();
 	unsigned long hour = (now_ms / (1000L * 60L * 60L)) % 24L;
 	unsigned long minutes = (now_ms / (1000L * 60L)) % 60L;
 	unsigned long seconds = (now_ms / 1000L) % 60L;
@@ -304,16 +246,15 @@ static void rk_printf(const char* fmt, ...) {
 	serial_print(&g_serial, str);
 }
 
-void rk_init_logging(void) {
-	sei(); // globally enable interrupts
-	timer_initialize();
+void rk_init_logging(time_now_ms_t callback) {
+	g_time_now_ms = callback ? callback : time_now_ms_noop;
 	serial_initialize(9600);
 
 	rk_printf("[ Logging ] Logging initialized, waiting for wall clock time.\n");
 
 	char input_buf[64] = { 0 };
 	const unsigned long timeout_ms = 2000;
-	const unsigned long start_ms = time_now_ms();
+	const unsigned long start_ms = g_time_now_ms();
 	while (true) {
 		/* Read input, look for clock time */
 		serial_read_string(&g_serial, input_buf, 64);
@@ -326,7 +267,7 @@ void rk_init_logging(void) {
 		}
 
 		/* Timed out, abort */
-		const unsigned long now_ms = time_now_ms();
+		const unsigned long now_ms = g_time_now_ms();
 		if (now_ms - start_ms > timeout_ms) {
 			rk_printf("[ Logging ] Timed out on getting wall clock time (waited %lu milliseconds).\n", timeout_ms);
 			break;
